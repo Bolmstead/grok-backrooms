@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grok Conversation</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: "Courier New", Courier, monospace;
+        margin: 0;
+        padding: 20px;
+        background-color: #0f0f0f;
+        color: #33ff33;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      h1 {
+        color: #33ff33;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      button {
+        background-color: #333;
+        color: #33ff33;
+        border: 1px solid #33ff33;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-family: "Courier New", Courier, monospace;
+      }
+
+      button:hover {
+        background-color: #444;
+      }
+
+      .status {
+        text-align: center;
+        margin-bottom: 20px;
+        font-style: italic;
+      }
+
+      .conversation {
+        border: 1px solid #33ff33;
+        height: 500px;
+        overflow-y: auto;
+        padding: 10px;
+        background-color: #111;
+      }
+
+      .message {
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 5px;
+        white-space: pre-wrap;
+      }
+
+      .grok1 {
+        background-color: #113311;
+        border-left: 4px solid #33ff33;
+      }
+
+      .grok2 {
+        background-color: #111133;
+        border-left: 4px solid #3333ff;
+      }
+
+      .timestamp {
+        font-size: 12px;
+        color: #999;
+        margin-bottom: 5px;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>xAI Grok Conversation</h1>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn">Start New Conversation</button>
+        <button id="stopBtn" disabled>Stop Conversation</button>
+      </div>
+
+      <div class="status" id="status">Ready to start a new conversation.</div>
+
+      <div class="conversation" id="conversation"></div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const socket = io(window.location.origin);
+
+        const startBtn = document.getElementById("startBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const statusEl = document.getElementById("status");
+        const conversationEl = document.getElementById("conversation");
+
+        let currentConversationId = null;
+
+        // Handle socket events
+        socket.on("connect", () => {
+          console.log("Connected to server");
+          statusEl.innerText =
+            "Connected to server. Ready to start conversation.";
+        });
+
+        socket.on("disconnect", () => {
+          console.log("Disconnected from server");
+          statusEl.innerText =
+            "Disconnected from server. Please refresh the page.";
+        });
+
+        socket.on("conversationStarted", (data) => {
+          console.log("Conversation started:", data);
+          currentConversationId = data.conversationId;
+          statusEl.innerText = `Conversation started (ID: ${currentConversationId})`;
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+        });
+
+        socket.on("conversationStopped", (data) => {
+          console.log("Conversation stopped:", data);
+          statusEl.innerText = `Conversation stopped (ID: ${data.conversationId})`;
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+        });
+
+        socket.on("newMessage", (data) => {
+          console.log("New message received:", data);
+          if (data.conversationId === currentConversationId) {
+            addMessage(data.message);
+
+            // Auto-scroll to bottom
+            conversationEl.scrollTop = conversationEl.scrollHeight;
+          }
+        });
+
+        socket.on("conversationError", (data) => {
+          console.error("Conversation error:", data);
+          if (data.conversationId === currentConversationId) {
+            statusEl.innerText = `Error: ${data.error}`;
+          }
+        });
+
+        // Button event handlers
+        startBtn.addEventListener("click", async () => {
+          try {
+            statusEl.innerText = "Starting conversation...";
+            console.log("Sending request to start conversation");
+            const response = await fetch("/api/conversations/start", {
+              method: "POST",
+            });
+
+            const data = await response.json();
+            console.log("Start conversation response:", data);
+            if (!response.ok) {
+              throw new Error(data.error || "Failed to start conversation");
+            }
+
+            // Clear previous conversation
+            conversationEl.innerHTML = "";
+          } catch (error) {
+            console.error("Error starting conversation:", error);
+            statusEl.innerText = `Error: ${error.message}`;
+          }
+        });
+
+        stopBtn.addEventListener("click", async () => {
+          if (!currentConversationId) return;
+
+          try {
+            statusEl.innerText = "Stopping conversation...";
+            console.log(`Stopping conversation: ${currentConversationId}`);
+            const response = await fetch(
+              `/api/conversations/stop/${currentConversationId}`,
+              {
+                method: "POST",
+              }
+            );
+
+            const data = await response.json();
+            console.log("Stop conversation response:", data);
+            if (!response.ok) {
+              throw new Error(data.error || "Failed to stop conversation");
+            }
+          } catch (error) {
+            console.error("Error stopping conversation:", error);
+            statusEl.innerText = `Error: ${error.message}`;
+          }
+        });
+
+        // Helper function to add a message to the conversation
+        function addMessage(message) {
+          const msgEl = document.createElement("div");
+          msgEl.className = `message ${message.sender}`;
+
+          const timestamp = new Date(message.timestamp).toLocaleTimeString();
+
+          msgEl.innerHTML = `
+          <div class="timestamp">${message.sender.toUpperCase()} | ${timestamp}</div>
+          <pre>${escapeHTML(message.content)}</pre>
+        `;
+
+          conversationEl.appendChild(msgEl);
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHTML(text) {
+          return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        }
+
+        // Load conversation history if conversationId is in the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlConversationId = urlParams.get("id");
+
+        if (urlConversationId) {
+          currentConversationId = urlConversationId;
+          loadConversationHistory(urlConversationId);
+        }
+
+        async function loadConversationHistory(conversationId) {
+          try {
+            statusEl.innerText = "Loading conversation history...";
+            console.log(`Loading history for conversation: ${conversationId}`);
+            const response = await fetch(
+              `/api/conversations/${conversationId}/history`
+            );
+
+            const data = await response.json();
+            console.log("History response:", data);
+            if (!response.ok) {
+              throw new Error(
+                data.error || "Failed to load conversation history"
+              );
+            }
+
+            // Clear and add all messages
+            conversationEl.innerHTML = "";
+            data.messages.forEach(addMessage);
+
+            // Update status and buttons
+            statusEl.innerText = `Viewing conversation (ID: ${conversationId})`;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+
+            // Auto-scroll to bottom
+            conversationEl.scrollTop = conversationEl.scrollHeight;
+          } catch (error) {
+            console.error("Error loading conversation history:", error);
+            statusEl.innerText = `Error: ${error.message}`;
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
