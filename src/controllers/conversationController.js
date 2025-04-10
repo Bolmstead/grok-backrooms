@@ -9,87 +9,93 @@ const Service = AnthropicService;
 class ConversationController {
   constructor(io) {
     this.io = io;
-    this.activeConversations = new Map();
+    this.grok1Context = [];
+    this.grok2Context = [];
+    this.isRunning = false;
   }
 
   async startNewConversation() {
-    const conversationId = uuidv4();
-
     // Initialize conversation contexts for both Groks
-    const grok1Context = [
-      {
-        role: "user",
-        content: "Let's begin.",
-      },
-    ];
 
-    const grok2Context = [];
+    console.log(`New conversation started`);
+    const conversationHistory = await this.getConversationHistory();
+    console.log(
+      "🚀 ~ ConversationController ~ startNewConversation ~ conversationHistory:",
+      conversationHistory
+    );
+    if (conversationHistory.length > 0) {
+      this.grok1Context = conversationHistory.map((message) => ({
+        role: message.sender === "grok1" ? "assistant" : "user",
+        content: message.content,
+      }));
+      this.grok2Context = conversationHistory.map((message) => ({
+        role: message.sender === "grok2" ? "assistant" : "user",
+        content: message.content,
+      }));
+    } else {
+      this.grok1Context = [
+        {
+          role: "user",
+          content: "Let's begin.",
+        },
+      ];
+      this.grok2Context = [
+        {
+          role: "assistant",
+          content: "Let's begin.",
+        },
+      ];
+    }
+    this.isRunning = true;
 
-    this.activeConversations.set(conversationId, {
-      grok1Context,
-      grok2Context,
-      isRunning: true,
-    });
-
-    console.log(`New conversation started with ID: ${conversationId}`);
-    this.io.emit("conversationStarted", { conversationId });
+    this.io.emit("conversationStarted", {});
 
     // Start the conversation loop
-    this.continueConversation(conversationId);
+    this.continueConversation();
 
-    return conversationId;
+    return;
   }
 
-  async stopConversation(conversationId) {
-    const conversation = this.activeConversations.get(conversationId);
-    if (conversation) {
-      conversation.isRunning = false;
-      console.log(`Conversation ${conversationId} stopped`);
-      this.io.emit("conversationStopped", { conversationId });
-      return true;
-    }
-    return false;
-  }
-
-  async continueConversation(conversationId) {
-    const conversation = this.activeConversations.get(conversationId);
-    if (!conversation || !conversation.isRunning) return;
+  async continueConversation() {
+    if (!this.isRunning) return;
 
     try {
       // Keep only the last 10 messages for context
-      const grok1Context = conversation.grok1Context.slice(-10);
+      this.grok1Context = this.grok1Context.slice(-10);
 
-      const grok2Context = conversation.grok2Context.slice(-10);
+      this.grok2Context = this.grok2Context.slice(-10);
 
       // Grok1 generates a response
       console.log("Grok #1 preparing its message...");
-      console.log("Grok #1 context: ", grok1Context);
+      console.log("Grok #1 context: ", this.grok1Context);
       const grok1Response = await Service.sendMessage(
-        grok1Context,
+        this.grok1Context,
         servicePrompts.backroomsGrok1
       );
 
       // Add Grok1's response to both contexts
-      conversation.grok1Context.push({
+      // Update grok1Context array
+      this.grok1Context.push({
         role: "assistant",
         content: grok1Response,
       });
-      conversation.grok2Context.push({ role: "user", content: grok1Response });
+      this.grok2Context.push({
+        role: "user",
+        content: grok1Response,
+      });
 
       // Save Grok1's message to the database
       const grok1Message = new Message({
         content: grok1Response,
         sender: "grok1",
-        conversationId,
       });
       await grok1Message.save();
 
       // Emit the message to clients
-      console.log(`Grok #1: ${grok1Response}`);
+      console.log(`Grok #1 response: ${grok1Response}`);
       this.io.emit("newMessage", {
-        conversationId,
         message: {
-          content: grok1Response,
+          content: grok1Message.content,
           sender: "grok1",
           timestamp: grok1Message.timestamp,
         },
@@ -97,22 +103,20 @@ class ConversationController {
 
       // Wait a bit before Grok2 responds
       setTimeout(async () => {
-        if (!this.activeConversations.get(conversationId)?.isRunning) return;
-
         // Grok2 generates a response
         console.log("Grok #2 preparing its message...");
-        console.log("Grok #2 context: ", grok2Context);
+        console.log("Grok #2 context: ", this.grok2Context);
         const grok2Response = await Service.sendMessage(
-          grok2Context,
+          this.grok2Context,
           servicePrompts.backroomsGrok2
         );
 
         // Add Grok2's response to both contexts
-        conversation.grok1Context.push({
+        this.grok1Context.push({
           role: "user",
           content: grok2Response,
         });
-        conversation.grok2Context.push({
+        this.grok2Context.push({
           role: "assistant",
           content: grok2Response,
         });
@@ -121,16 +125,14 @@ class ConversationController {
         const grok2Message = new Message({
           content: grok2Response,
           sender: "grok2",
-          conversationId,
         });
         await grok2Message.save();
 
         // Emit the message to clients
-        console.log(`Grok #2: ${grok2Response}`);
+        console.log(`Grok #2 response: ${grok2Response}`);
         this.io.emit("newMessage", {
-          conversationId,
           message: {
-            content: grok2Response,
+            content: grok2Message.content,
             sender: "grok2",
             timestamp: grok2Message.timestamp,
           },
@@ -138,7 +140,7 @@ class ConversationController {
 
         // Continue the conversation after a delay
         setTimeout(() => {
-          this.continueConversation(conversationId);
+          this.continueConversation();
         }, delayBetweenMessages);
       }, delayBetweenMessages);
     } catch (error) {
@@ -150,16 +152,14 @@ class ConversationController {
 
       // Try to continue after an error with a delay
       setTimeout(() => {
-        this.continueConversation(conversationId);
-      }, 5000);
+        this.continueConversation();
+      }, delayBetweenMessages);
     }
   }
 
-  async getConversationHistory(conversationId) {
+  async getConversationHistory() {
     try {
-      const messages = await Message.find({ conversationId })
-        .sort({ timestamp: 1 })
-        .lean();
+      const messages = await Message.find().sort({ timestamp: 1 }).limit(10);
       return messages;
     } catch (error) {
       console.error("Error fetching conversation history:", error);

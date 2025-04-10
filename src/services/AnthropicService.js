@@ -24,7 +24,6 @@ class AnthropicService {
           content: msg.content,
         }));
 
-
       console.log("👀👀👀👀 Messages array for Anthropic:", messageArray);
 
       // Create the API request with the system as a top-level parameter

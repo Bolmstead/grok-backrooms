@@ -7,16 +7,12 @@ const MessageSchema = new mongoose.Schema({
   },
   sender: {
     type: String,
-    enum: ["grok1", "grok2"],
+    enum: ["grok1", "grok2", "user"],
     required: true,
   },
   timestamp: {
     type: Date,
     default: Date.now,
-  },
-  conversationId: {
-    type: String,
-    required: true,
   },
 });
 
