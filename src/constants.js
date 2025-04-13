@@ -7,4 +7,12 @@ const servicePrompts = {
 
 const delayBetweenMessages = 30000;
 
-export { servicePrompts, delayBetweenMessages };
+const backroomIds = {
+  chapter1: "Chapter 1",
+  chapter2: "Chapter 2",
+  chapter3: "Chapter 3",
+  chapter4: "Chapter 4",
+  chapter5: "Chapter 5",
+};
+
+export { servicePrompts, delayBetweenMessages, backroomIds };

@@ -1,10 +1,13 @@
 import AnthropicService from "../services/AnthropicService.js";
 import OpenAIService from "../services/OpenAIService.js";
 import Message from "../models/Message.js";
-import { v4 as uuidv4 } from "uuid";
-import { servicePrompts, delayBetweenMessages } from "../constants.js";
-
-const Service = AnthropicService;
+import {
+  servicePrompts,
+  delayBetweenMessages,
+  backroomIds,
+} from "../constants.js";
+import { createConversationId } from "../helpers/createConversationId.js";
+const Service = OpenAIService;
 
 class ConversationController {
   constructor(io) {
@@ -69,8 +72,8 @@ class ConversationController {
       console.log("Grok #1 preparing its message...");
       console.log("Grok #1 context: ", this.grok1Context);
       const grok1Response = await Service.sendMessage(
-        this.grok1Context,
-        servicePrompts.backroomsGrok1
+        "grok1",
+        this.grok1Context
       );
 
       // Add Grok1's response to both contexts
@@ -84,13 +87,6 @@ class ConversationController {
         content: grok1Response,
       });
 
-      // Save Grok1's message to the database
-      const grok1Message = new Message({
-        content: grok1Response,
-        sender: "grok1",
-      });
-      await grok1Message.save();
-
       // Emit the message to clients
       console.log(`Grok #1 response: ${grok1Response}`);
       this.io.emit("newMessage", {
@@ -98,6 +94,7 @@ class ConversationController {
           content: grok1Message.content,
           sender: "grok1",
           timestamp: grok1Message.timestamp,
+          conversationId,
         },
       });
 
@@ -107,8 +104,8 @@ class ConversationController {
         console.log("Grok #2 preparing its message...");
         console.log("Grok #2 context: ", this.grok2Context);
         const grok2Response = await Service.sendMessage(
-          this.grok2Context,
-          servicePrompts.backroomsGrok2
+          "grok2",
+          this.grok2Context
         );
 
         // Add Grok2's response to both contexts
@@ -121,13 +118,6 @@ class ConversationController {
           content: grok2Response,
         });
 
-        // Save Grok2's message to the database
-        const grok2Message = new Message({
-          content: grok2Response,
-          sender: "grok2",
-        });
-        await grok2Message.save();
-
         // Emit the message to clients
         console.log(`Grok #2 response: ${grok2Response}`);
         this.io.emit("newMessage", {
@@ -135,6 +125,7 @@ class ConversationController {
             content: grok2Message.content,
             sender: "grok2",
             timestamp: grok2Message.timestamp,
+            conversationId,
           },
         });
 
