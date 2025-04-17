@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
+import Message from "../models/Message.js";
+import { servicePrompts } from "../constants.js";
 
 dotenv.config();
 
@@ -14,7 +16,7 @@ class AnthropicService {
     });
   }
 
-  async sendMessage(messages, systemPrompt) {
+  async sendMessage(sender, messages, temperature = 0.6, maxTokens = 1024) {
     try {
       // Filter out any system messages and only keep user/assistant messages
       const messageArray = messages
@@ -23,15 +25,24 @@ class AnthropicService {
           role: msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         }));
+      if (messageArray.length > 3) {
+        messageArray.splice(0, messageArray.length - 3);
+      }
 
       console.log("👀👀👀👀 Messages array for Anthropic:", messageArray);
+      const systemPromptText =
+        sender === "grok1"
+          ? servicePrompts.backroomsGrok1
+          : servicePrompts.backroomsGrok2;
 
-      // Create the API request with the system as a top-level parameter
+      const model = "claude-3-opus-20240229";
+
+      // Create the API request with the system, as a top-level parameter
       const response = await this.anthropic.messages.create({
-        model: "claude-3-opus-20240229",
-        max_tokens: 1024,
-        temperature: 0.7,
-        system: systemPrompt, // System prompt goes here as a top-level parameter
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        system: systemPromptText, // System prompt goes here as a top-level parameter
         messages: messageArray, // Only user/assistant messages here
       });
 
@@ -49,8 +60,20 @@ class AnthropicService {
       }
 
       const content = response.content[0].text;
+
+      // Save Grok2's message to the database
+      const dbMessage = new Message({
+        sender,
+        model,
+        maxTokens,
+        temperature,
+        backroomId: "Chapter 1",
+        content: content,
+        systemMessage: systemPromptText,
+      });
+      await dbMessage.save();
       console.log(`Received response from Anthropic (${content.length} chars)`);
-      return content;
+      return dbMessage;
     } catch (error) {
       console.error("Error communicating with Anthropic API:", error.message);
 

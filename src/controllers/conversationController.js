@@ -1,159 +1,209 @@
-import AnthropicService from "../services/AnthropicService.js";
-import OpenAIService from "../services/OpenAIService.js";
 import Message from "../models/Message.js";
+import Scenario from "../models/Scenario.js";
+import sendOpenAIMessage from "../services/sendOpenAIMessage.js";
+import OpenAI from "openai";
 import {
   servicePrompts,
   delayBetweenMessages,
   backroomIds,
 } from "../constants.js";
-import { createConversationId } from "../helpers/createConversationId.js";
-const Service = OpenAIService;
 
 class ConversationController {
   constructor(io) {
+    console.log("🎮 Initializing Conversation Controller...");
     this.io = io;
-    this.grok1Context = [];
-    this.grok2Context = [];
+    this.ai1Context = [];
+    this.ai2Context = [];
     this.isRunning = false;
+    this.ai1Service = null;
+    this.ai2Service = null;
+    this.scenario = null;
   }
 
-  async startNewConversation() {
+  async startNewConversation(scenario) {
+    console.log("🚀 Starting new conversation with scenario:", scenario);
     // Initialize conversation contexts for both Groks
+    try {
+      this.isRunning = true;
+      const { scenarioId } = scenario;
+      console.log("📝 Processing scenario ID:", scenarioId);
+      let scenarioInDB;
+      console.log(`💫 New conversation initialized!`);
+      scenarioInDB = await Scenario.findOne({
+        scenarioId,
+      });
+      if (!scenarioInDB) {
+        console.log("🆕 Creating new scenario in database...");
+        scenarioInDB = await Scenario.create(scenario);
+      }
+      this.scenario = scenarioInDB;
+      const conversationHistory = await this.getConversationHistory(
+        scenarioInDB
+      );
+      console.log("📚 Retrieved conversation history:", conversationHistory);
+      if (conversationHistory.length > 0) {
+        console.log("🔄 Loading existing conversation context...");
+        this.ai1Context = conversationHistory.map((message) => ({
+          role: message.messageCreatedBy === "ai1" ? "user" : "assistant",
+          content: message.content,
+        }));
+        this.ai2Context = conversationHistory.map((message) => ({
+          role: message.messageCreatedBy === "ai2" ? "user" : "assistant",
+          content: message.content,
+        }));
+      } else {
+        console.log("🌟 Setting up fresh conversation context...");
+        this.ai1Context = scenarioInDB.startingContextAI1;
+        this.ai2Context = scenarioInDB.startingContextAI2;
+        this.isRunning = true;
+      }
+      this.io.emit("conversationStarted", {});
 
-    console.log(`New conversation started`);
-    const conversationHistory = await this.getConversationHistory();
-    console.log(
-      "🚀 ~ ConversationController ~ startNewConversation ~ conversationHistory:",
-      conversationHistory
-    );
-    if (conversationHistory.length > 0) {
-      this.grok1Context = conversationHistory.map((message) => ({
-        role: message.sender === "grok1" ? "assistant" : "user",
-        content: message.content,
-      }));
-      this.grok2Context = conversationHistory.map((message) => ({
-        role: message.sender === "grok2" ? "assistant" : "user",
-        content: message.content,
-      }));
-    } else {
-      this.grok1Context = [
-        {
-          role: "user",
-          content: "Let's begin.",
-        },
-      ];
-      this.grok2Context = [
-        {
-          role: "assistant",
-          content: "Let's begin.",
-        },
-      ];
+      let ai1APIKey, ai2APIKey, ai1BaseURL, ai2BaseURL;
+
+      console.log("🔑 Configuring API settings...");
+      if (scenarioInDB.ai1Model.includes("grok")) {
+        ai1APIKey = process.env.XAI_API_KEY;
+        ai1BaseURL = "https://api.x.ai/v1";
+      } else if (scenarioInDB.ai1Model.includes("claude")) {
+        ai1APIKey = process.env.CLAUDE_API_KEY;
+        ai1BaseURL = "https://api.anthropic.com/v1";
+      } else if (scenarioInDB.ai1Model.includes("openai")) {
+        ai1APIKey = process.env.OPENAI_API_KEY;
+        ai1BaseURL = "https://api.openai.com/v1";
+      }
+
+      if (scenarioInDB.ai2Model.includes("grok")) {
+        ai2APIKey = process.env.XAI_API_KEY;
+        ai2BaseURL = "https://api.x.ai/v1";
+      } else if (scenarioInDB.ai2Model.includes("claude")) {
+        ai2APIKey = process.env.CLAUDE_API_KEY;
+        ai2BaseURL = "https://api.anthropic.com/v1";
+      } else if (scenarioInDB.ai2Model.includes("openai")) {
+        ai2APIKey = process.env.OPENAI_API_KEY;
+        ai2BaseURL = "https://api.openai.com/v1";
+      }
+
+      console.log("🤖 Initializing AI services...");
+      if (ai2APIKey === ai1APIKey) {
+        this.ai1Service = new OpenAI({
+          apiKey: ai1APIKey,
+          baseURL: ai1BaseURL,
+        });
+        this.ai2Service = this.ai1Service;
+      } else {
+        this.ai1Service = new OpenAI({
+          apiKey: ai1APIKey,
+          baseURL: ai1BaseURL,
+        });
+        this.ai2Service = new OpenAI({
+          apiKey: ai2APIKey,
+          baseURL: ai2BaseURL,
+        });
+      }
+
+      console.log("🎯 Starting conversation loop...");
+      this.continueConversation();
+
+      return true;
+    } catch (error) {
+      console.error("❌ Error starting conversation:", error);
+      throw error;
     }
-    this.isRunning = true;
-
-    this.io.emit("conversationStarted", {});
-
-    // Start the conversation loop
-    this.continueConversation();
-
-    return;
   }
 
   async continueConversation() {
-    if (!this.isRunning) return;
+    if (!this.isRunning) {
+      console.log("⏸️ Conversation paused");
+      return;
+    }
 
     try {
+      console.log("🔄 Trimming conversation context...");
       // Keep only the last 10 messages for context
-      this.grok1Context = this.grok1Context.slice(-10);
+      this.ai1Context = this.ai1Context.slice(-10);
+      this.ai2Context = this.ai2Context.slice(-10);
 
-      this.grok2Context = this.grok2Context.slice(-10);
-
-      // Grok1 generates a response
-      console.log("Grok #1 preparing its message...");
-      console.log("Grok #1 context: ", this.grok1Context);
-      const grok1Response = await Service.sendMessage(
-        "grok1",
-        this.grok1Context
+      // ai1 generates a response
+      console.log("🤖 AI #1 thinking...");
+      console.log("📜 AI #1 context:", this.ai1Context);
+      const savedAI1Message = await sendOpenAIMessage(
+        "ai1",
+        this.ai1Context,
+        this.scenario
       );
 
-      // Add Grok1's response to both contexts
-      // Update grok1Context array
-      this.grok1Context.push({
+      console.log("💬 Adding AI #1's response to context...");
+      // Add ai1's response to both contexts
+      this.ai1Context.push({
         role: "assistant",
-        content: grok1Response,
+        content: savedAI1Message.content,
       });
-      this.grok2Context.push({
+      this.ai2Context.push({
         role: "user",
-        content: grok1Response,
+        content: savedAI1Message.content,
       });
 
-      // Emit the message to clients
-      console.log(`Grok #1 response: ${grok1Response}`);
+      console.log(`📢 AI #1 says: ${savedAI1Message.content}`);
       this.io.emit("newMessage", {
-        message: {
-          content: grok1Message.content,
-          sender: "grok1",
-          timestamp: grok1Message.timestamp,
-          conversationId,
-        },
+        ...savedAI1Message._doc,
       });
 
-      // Wait a bit before Grok2 responds
       setTimeout(async () => {
-        // Grok2 generates a response
-        console.log("Grok #2 preparing its message...");
-        console.log("Grok #2 context: ", this.grok2Context);
-        const grok2Response = await Service.sendMessage(
-          "grok2",
-          this.grok2Context
+        console.log("🤖 AI #2 thinking...");
+        console.log("📜 AI #2 context:", this.ai2Context);
+        const savedAI2Message = await sendOpenAIMessage(
+          "ai2",
+          this.ai2Context,
+          this.scenario
         );
 
-        // Add Grok2's response to both contexts
-        this.grok1Context.push({
+        console.log("💬 Adding AI #2's response to context...");
+        this.ai1Context.push({
           role: "user",
-          content: grok2Response,
+          content: savedAI2Message.content,
         });
-        this.grok2Context.push({
+        this.ai2Context.push({
           role: "assistant",
-          content: grok2Response,
+          content: savedAI2Message.content,
         });
 
-        // Emit the message to clients
-        console.log(`Grok #2 response: ${grok2Response}`);
+        console.log(`📢 AI #2 says: ${savedAI2Message.content}`);
         this.io.emit("newMessage", {
-          message: {
-            content: grok2Message.content,
-            sender: "grok2",
-            timestamp: grok2Message.timestamp,
-            conversationId,
-          },
+          ...savedAI2Message._doc,
         });
 
-        // Continue the conversation after a delay
+        console.log("⏳ Waiting before next exchange...");
         setTimeout(() => {
           this.continueConversation();
         }, delayBetweenMessages);
       }, delayBetweenMessages);
     } catch (error) {
-      console.error("Error in conversation:", error);
+      console.error("❌ Conversation error:", error);
       this.io.emit("conversationError", {
-        conversationId,
         error: error.message,
       });
 
-      // Try to continue after an error with a delay
+      console.log("🔄 Attempting to recover from error...");
       setTimeout(() => {
         this.continueConversation();
       }, delayBetweenMessages);
     }
   }
 
-  async getConversationHistory() {
+  async getConversationHistory(scenario) {
     try {
-      const messages = await Message.find().sort({ timestamp: 1 }).limit(10);
+      console.log("📚 Fetching conversation history...");
+      const messages = await Message.find({
+        scenario,
+        messageCreatedBy: { $ne: "status" },
+      })
+        .sort({ timestamp: 1 })
+        .limit(5);
+      console.log(`✨ Found ${messages.length} historical messages`);
       return messages;
     } catch (error) {
-      console.error("Error fetching conversation history:", error);
+      console.error("❌ Error fetching conversation history:", error);
       throw error;
     }
   }

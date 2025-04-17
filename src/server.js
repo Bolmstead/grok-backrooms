@@ -43,11 +43,6 @@ const conversationController = new ConversationController(io);
 // Set up routes
 app.use("/api/conversations", createRouter(conversationController));
 
-// Serve the frontend
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/index.html"));
-});
-
 // Socket.IO connection handling
 io.on("connection", (socket) => {
   console.log("New client connected");
@@ -58,7 +53,7 @@ io.on("connection", (socket) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 6969;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

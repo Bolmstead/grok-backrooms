@@ -6,10 +6,13 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "createCoin": "node src/helpers/createPumpfunCoin.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.18.0",
+    "@solana/web3.js": "^1.98.0",
+    "bs58": "^6.0.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "mongoose": "^8.0.3",

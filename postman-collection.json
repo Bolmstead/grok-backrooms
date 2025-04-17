@@ -1,0 +1,77 @@
+{
+  "info": {
+    "name": "Infinite Backrooms API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Start Conversation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"scenarioId\": \"Chapter 1\",\n    \"startingContextAI1\": [\n        {\n            \"role\": \"system\",\n            \"content\": \"You are AI1 in a conversation.\"\n        }\n    ],\n    \"startingContextAI2\": [\n        {\n            \"role\": \"system\",\n            \"content\": \"You are AI2 in a conversation.\"\n        }\n    ],\n    \"ai1Model\": \"gpt-4\",\n    \"ai2Model\": \"gpt-4\",\n    \"systemMessageAI1\": \"You are AI1 in a conversation.\",\n    \"systemMessageAI2\": \"You are AI2 in a conversation.\",\n    \"maxTokens\": 1000,\n    \"temperature\": 0.7\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/start",
+          "host": ["{{base_url}}"],
+          "path": ["start"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Test Endpoints",
+      "item": [
+        {
+          "name": "GET Test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/test",
+              "host": ["{{base_url}}"],
+              "path": ["test"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"test\": \"test data\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/test",
+              "host": ["{{base_url}}"],
+              "path": ["test"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:6969/api/conversations",
+      "type": "string"
+    }
+  ]
+}
