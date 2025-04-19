@@ -98,7 +98,7 @@ export default async function createPumpfunCoin(coinData) {
         },
         mint: mintKeypair.publicKey.toBase58(),
         denominatedInSol: "true",
-        amount: 1, // dev buy of 1 SOL
+        amount: 0.1, // dev buy of 1 SOL
         slippage: 10,
         priorityFee: 0.0005,
         pool: "pump",
@@ -135,4 +135,4 @@ const coinData = {
   imageFileName: "grok.png",
 };
 
-createPumpfunCoin(coinData);
+// createPumpfunCoin(coinData);

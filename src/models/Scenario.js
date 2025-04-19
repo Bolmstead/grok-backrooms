@@ -68,6 +68,14 @@ const ScenarioSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  createMemecoins: {
+    type: Boolean,
+    required: false,
+  },
+  coinCreationRequest: {
+    type: String,
+    required: false,
+  },
 });
 
 export default mongoose.model("Scenario", ScenarioSchema);

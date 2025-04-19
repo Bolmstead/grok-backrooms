@@ -1,27 +1,38 @@
 import mongoose from "mongoose";
 
-const MessageSchema = new mongoose.Schema({
-  content: {
-    type: String,
-    required: true,
+const messageSchema = new mongoose.Schema(
+  {
+    scenario: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Scenario",
+      required: true,
+    },
+    content: {
+      type: String,
+      required: true,
+    },
+    messageCreatedBy: {
+      type: String,
+      enum: ["ai1", "ai2", "user", "status"],
+      required: true,
+    },
+    coinCreationRequest: {
+      type: Object,
+      default: null,
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now,
+    },
   },
-  messageCreatedBy: {
-    type: String,
-    enum: ["ai1", "ai2", "user", "status"],
-    required: true,
-  },
-  scenario: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Scenario",
-    required: true,
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  {
+    timestamps: true,
+  }
+);
 
 // Create text index on content field
-MessageSchema.index({ content: "text" });
+messageSchema.index({ content: "text" });
 
-export default mongoose.model("Message", MessageSchema);
+const Message = mongoose.model("Message", messageSchema);
+
+export default Message;

@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import dotenv from "dotenv";
 import Message from "../models/Message.js";
 import Scenario from "../models/Scenario.js";
-import { models } from "../constants.js";
+import { models, coinCreationPrompt } from "../constants.js";
 dotenv.config();
 
 // Create a singleton OpenAI instance
@@ -41,7 +41,7 @@ async function sendOpenAIMessage(receiver, messages, scenario) {
       ai1Temperature,
       ai2Temperature,
     } = scenario;
-    let systemPrompt, model, temperature;
+    let systemPrompt, model, temperature, coinCreationRequest, openai;
 
     console.log("🎭 Determining AI role and model...");
     if (receiver === "ai2") {
@@ -55,8 +55,6 @@ async function sendOpenAIMessage(receiver, messages, scenario) {
       model = ai1Model;
       temperature = ai1Temperature;
     }
-
-    let openai;
 
     if (model.includes("grok")) {
       openai = xAIService;
@@ -87,14 +85,18 @@ async function sendOpenAIMessage(receiver, messages, scenario) {
     console.log("🎯 Inserting system message at start");
     const systemMessage = { role: "system", content: systemPrompt };
     messageArray.unshift(systemMessage);
-
-    console.log("📬 Final message array structure:", messageArray);
+    console.log(
+      "🧑🏻‍🦯‍➡️🧑🏻‍🦯‍➡️🧑🏻‍🦯‍➡️🧑🏻‍🦯‍➡️ ~ sendOpenAIMessage ~ systemMessage:",
+      systemMessage
+    );
 
     console.log("🚀 Preparing API request with params:", {
       model,
       temperature,
       maxTokens,
     });
+
+    // Add system message about coin creation
 
     console.log("⏳ Awaiting OpenAI response...");
     const response = await openai.chat.completions.create({
@@ -103,6 +105,12 @@ async function sendOpenAIMessage(receiver, messages, scenario) {
       temperature,
       max_tokens: maxTokens,
     });
+    console.log("🚀 ~ sendOpenAIMessage ~ response:", response);
+
+    console.log(
+      "🚀 ~ sendOpenAIMessage ~ response.choices[0]:",
+      response.choices[0]
+    );
 
     const responseMessage = response.choices[0].message.content;
     console.log("💫 Received AI response:", responseMessage);
@@ -112,7 +120,9 @@ async function sendOpenAIMessage(receiver, messages, scenario) {
       scenario,
       content: responseMessage,
       messageCreatedBy: receiver,
+      coinCreationRequest: coinCreationRequest,
     });
+    console.log("🤞 ~ sendOpenAIMessage ~ dbMessage:", dbMessage);
 
     console.log("💽 Saving message to database...");
     await dbMessage.save();

@@ -2,6 +2,8 @@ import Message from "../models/Message.js";
 import Scenario from "../models/Scenario.js";
 import sendOpenAIMessage from "../services/sendOpenAIMessage.js";
 import OpenAI from "openai";
+import createPumpfunCoin from "../helpers/createPumpfunCoin.js";
+import { agent } from "../helpers/agent.js";
 import {
   servicePrompts,
   delayBetweenMessages,
@@ -18,6 +20,79 @@ class ConversationController {
     this.ai1Service = null;
     this.ai2Service = null;
     this.scenario = null;
+    this.coinCreationEnabled = true; // Enable coin creation by default
+  }
+
+  async handleCoinCreation(aiName, message) {
+    try {
+      console.log(`🪙 ${aiName} is requesting coin creation`);
+
+      // Extract potential coin information from message content
+      const content = message.content || "";
+
+      // Use the LangGraph agent to handle coin creation
+      console.log("🤖 Using LangGraph agent for coin creation");
+      const result = await agent.invoke({
+        input: `Create a memecoin based on this message: ${content}`,
+      });
+
+      console.log("🚀 LangGraph agent result:", result);
+
+      let newCoinMessage;
+      if (result && result.output) {
+        newCoinMessage = `
+--------------------------------
+Memecoin Creation Result
+${result.output}
+--------------------------------
+`;
+      } else {
+        newCoinMessage = `
+--------------------------------
+Memecoin Creation Failed
+Unable to process the request through LangGraph agent
+--------------------------------
+`;
+      }
+
+      const newCoinMessageDB = new Message({
+        scenario: this.scenario,
+        messageCreatedBy: aiName,
+        content: newCoinMessage,
+      });
+      await newCoinMessageDB.save();
+      this.io.emit("newMessage", {
+        ...newCoinMessageDB._doc,
+      });
+      if (aiName === "ai1") {
+        this.ai1Context.push({
+          role: "assistant",
+          content: newCoinMessageDB.content,
+        });
+        this.ai2Context.push({
+          role: "user",
+          content: newCoinMessageDB.content,
+        });
+      } else {
+        this.ai1Context.push({
+          role: "user",
+          content: newCoinMessageDB.content,
+        });
+        this.ai2Context.push({
+          role: "assistant",
+          content: newCoinMessageDB.content,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`❌ Error creating coin for ${aiName}:`, error);
+      this.io.emit("coinCreationError", {
+        aiName,
+        error: error.message,
+      });
+      throw error;
+    }
   }
 
   async startNewConversation(scenario) {
@@ -132,7 +207,6 @@ class ConversationController {
         this.ai1Context,
         this.scenario
       );
-
       console.log("💬 Adding AI #1's response to context...");
       // Add ai1's response to both contexts
       this.ai1Context.push({
@@ -148,6 +222,19 @@ class ConversationController {
       this.io.emit("newMessage", {
         ...savedAI1Message._doc,
       });
+      // Alternative detection method - check if message content contains coin creation keywords
+      if (
+        this.coinCreationEnabled &&
+        savedAI1Message.content &&
+        /\bI am going to create this (token|coin|memecoin|cryptocurrency)\b/i.test(
+          savedAI1Message.content
+        )
+      ) {
+        console.log(
+          "🔍 Detected explicit coin creation intent in AI1's message"
+        );
+        await this.handleCoinCreation("ai1", savedAI1Message);
+      }
 
       setTimeout(async () => {
         console.log("🤖 AI #2 thinking...");
@@ -157,7 +244,6 @@ class ConversationController {
           this.ai2Context,
           this.scenario
         );
-
         console.log("💬 Adding AI #2's response to context...");
         this.ai1Context.push({
           role: "user",
@@ -172,6 +258,20 @@ class ConversationController {
         this.io.emit("newMessage", {
           ...savedAI2Message._doc,
         });
+
+        // Alternative detection method - check if message content contains coin creation keywords
+        if (
+          this.coinCreationEnabled &&
+          savedAI2Message.content &&
+          /\bI am going to create this (token|coin|memecoin|cryptocurrency)\b/i.test(
+            savedAI2Message.content
+          )
+        ) {
+          console.log(
+            "🔍 Detected explicit coin creation intent in AI2's message"
+          );
+          await this.handleCoinCreation("ai2", savedAI2Message);
+        }
 
         console.log("⏳ Waiting before next exchange...");
         setTimeout(() => {
