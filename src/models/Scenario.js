@@ -68,7 +68,7 @@ const ScenarioSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  createMemecoins: {
+  createMemeCoins: {
     type: Boolean,
     required: false,
   },

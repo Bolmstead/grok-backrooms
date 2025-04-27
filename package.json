@@ -11,14 +11,21 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.18.0",
+    "@langchain/anthropic": "^0.3.18",
+    "@langchain/community": "^0.3.41",
+    "@langchain/core": "^0.3.45",
+    "@langchain/langgraph": "^0.2.65",
+    "@langchain/openai": "^0.5.7",
     "@solana/web3.js": "^1.98.0",
     "bs58": "^6.0.0",
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.4.7",
     "express": "^4.18.2",
+    "langchain": "^0.3.23",
     "mongoose": "^8.0.3",
     "openai": "^4.29.0",
     "socket.io": "^4.7.2",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "zod": "^3.24.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

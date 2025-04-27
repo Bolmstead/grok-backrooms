@@ -78,7 +78,7 @@ const backroomIds = {
   chapter1: "Chapter 1",
 };
 
-const coinCreationPrompt = `If you are on the topic of creating a memecoin and have decided on a name, ticker, description, and a very detailed meme image description please explicitly state "I am going to create this memecoin" in your response along with all of the coin information. For example:
+const coinCreationPrompt = `If you are on the topic of creating a memecoin and you sincerely believe in the memecoin (has a strong lore and is original and creative), you should create it. Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "I am going to create this memecoin" in your response along with all of the coin information. For example:
 I am going to create this memecoin
 Name: "Memecoin Name"
 Ticker: "MEME"

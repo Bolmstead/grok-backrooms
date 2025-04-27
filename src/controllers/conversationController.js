@@ -1,9 +1,11 @@
 import Message from "../models/Message.js";
 import Scenario from "../models/Scenario.js";
-import sendOpenAIMessage from "../services/sendOpenAIMessage.js";
+import {
+  sendOpenAIMessage,
+  createImage,
+} from "../services/sendOpenAIMessage.js";
 import OpenAI from "openai";
 import createPumpfunCoin from "../helpers/createPumpfunCoin.js";
-import { agent } from "../helpers/agent.js";
 import {
   servicePrompts,
   delayBetweenMessages,
@@ -29,20 +31,102 @@ class ConversationController {
 
       // Extract potential coin information from message content
       const content = message.content || "";
+      console.log(
+        `📝 Parsing message content for coin details: ${content.substring(
+          0,
+          100
+        )}...`
+      );
 
-      // Use the LangGraph agent to handle coin creation
-      console.log("🤖 Using LangGraph agent for coin creation");
-      const result = await agent.invoke({
-        input: `Create a memecoin based on this message: ${content}`,
+      // Parse coin details from message using improved regex patterns that handle multiline content
+      const nameMatch = content.match(/Name:\s*["']?(.*?)["']?(?:\r?\n|$)/);
+      const tickerMatch = content.match(/Ticker:\s*["']?(.*?)["']?(?:\r?\n|$)/);
+
+      // For description and image description, look for the next heading or end of text
+      const descriptionRegex =
+        /Description:\s*(["']?)([^]*?)(?:\1)(?:\r?\n(?:Image Description:|$)|$)/;
+      const descriptionMatch = content.match(descriptionRegex);
+
+      const imageDescriptionRegex =
+        /Image Description:\s*(["']?)([^]*?)(?:\1)(?:\r?\n\w+:|\r?\n$|$)/;
+      const imageDescriptionMatch = content.match(imageDescriptionRegex);
+
+      // Extract raw values first for logging
+      const rawName = nameMatch?.[1]?.trim();
+      const rawTicker = tickerMatch?.[1]?.trim();
+      const rawDescription = (
+        descriptionMatch?.[2] || descriptionMatch?.[1]
+      )?.trim();
+      const rawImageDescription = (
+        imageDescriptionMatch?.[2] || imageDescriptionMatch?.[1]
+      )?.trim();
+
+      // Extract values, clean them by removing quotes, and trim whitespace
+      const cleanValue = (value) => {
+        if (!value) return null;
+        // Remove quotes, trim whitespace, and normalize newlines
+        return value
+          .trim()
+          .replace(/^["']|["']$/g, "")
+          .replace(/\r?\n\s*/g, " ")
+          .trim();
+      };
+
+      const name = cleanValue(rawName);
+      const ticker = cleanValue(rawTicker);
+      const description = cleanValue(rawDescription);
+      const imageDescription = cleanValue(rawImageDescription);
+
+      console.log(`🪙 Extracted coin details (raw -> cleaned):
+      Name: "${rawName}" -> "${name}"
+      Ticker: "${rawTicker}" -> "${ticker}"
+      Description (start): "${rawDescription?.substring(
+        0,
+        30
+      )}..." -> "${description?.substring(0, 30)}..."
+      Image (start): "${rawImageDescription?.substring(
+        0,
+        30
+      )}..." -> "${imageDescription?.substring(0, 30)}..."`);
+
+      // Check if we have the required fields
+      if (!name || !ticker || !description) {
+        console.log("⚠️ Missing required coin details");
+        // Create a message informing that coin creation failed due to missing details
+        const errorMessage = `
+--------------------------------
+Memecoin Creation Failed
+Required information missing. Please specify Name, Ticker, and Description.
+--------------------------------
+`;
+        const errorMessageDB = new Message({
+          scenario: this.scenario,
+          messageCreatedBy: aiName,
+          content: errorMessage,
+        });
+        await errorMessageDB.save();
+        this.io.emit("newMessage", {
+          ...errorMessageDB._doc,
+        });
+        return { success: false, message: "Missing required coin information" };
+      }
+
+      // Use the direct createMemecoin function with extracted parameters
+      console.log("🤖 Directly creating memecoin with extracted parameters");
+      const result = await createPumpfunCoin({
+        name,
+        ticker,
+        description,
+        imageDescription,
       });
 
-      console.log("🚀 LangGraph agent result:", result);
+      console.log("🚀 Memecoin creation result:", result);
 
       let newCoinMessage;
-      if (result && result.output) {
+      if (result && result.success) {
         newCoinMessage = `
 --------------------------------
-Memecoin Creation Result
+Memecoin Creation Success
 ${result.output}
 --------------------------------
 `;
@@ -50,7 +134,7 @@ ${result.output}
         newCoinMessage = `
 --------------------------------
 Memecoin Creation Failed
-Unable to process the request through LangGraph agent
+${result?.output || "Unable to process the memecoin creation request"}
 --------------------------------
 `;
       }

@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-
+import { createImage } from "../services/sendOpenAIMessage.js";
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,21 +24,19 @@ export default async function createPumpfunCoin(coinData) {
   const mintKeypair = Keypair.generate();
   console.log("🎲 Generated new mint keypair");
 
-  const {
-    name,
-    symbol,
-    description,
-    twitter,
-    telegram,
-    website,
-    imageFileName,
-  } = coinData;
+  const { name, ticker, description, imageDescription } = coinData;
 
-  console.log(`📝 Processing token metadata for ${name} (${symbol})`);
+  console.log(`📝 Processing token metadata for ${name} (${ticker})`);
+  if (!name || !ticker || !description || !imageDescription) {
+    throw new Error("Missing required coin details");
+  }
+
+  const imageResult = await createImage(name, imageDescription);
+  const imagePath = imageResult.fullPath;
 
   // Define token metadata
   const formData = new FormData();
-  const imagePath = path.join(__dirname, "..", "images", imageFileName);
+  // const imagePath = path.join(__dirname, "..", "images", imageFileName);
   console.log(`🖼️ Loading image from: ${imagePath}`);
 
   // Check if image file exists
@@ -51,7 +49,7 @@ export default async function createPumpfunCoin(coinData) {
   const imageBuffer = await fs.promises.readFile(imagePath);
   formData.append("file", new Blob([imageBuffer]));
   formData.append("name", name);
-  formData.append("symbol", symbol);
+  formData.append("symbol", ticker);
   formData.append("description", description);
   formData.append("twitter", twitter);
   formData.append("telegram", telegram);

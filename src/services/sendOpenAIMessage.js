@@ -1,8 +1,7 @@
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import Message from "../models/Message.js";
-import Scenario from "../models/Scenario.js";
-import { models, coinCreationPrompt } from "../constants.js";
+import { coinCreationPrompt, models } from "../constants.js";
 dotenv.config();
 
 // Create a singleton OpenAI instance
@@ -76,11 +75,22 @@ async function sendOpenAIMessage(receiver, messages, scenario) {
 
     console.log("✂️ Trimming conversation history...");
     console.log("👀 messageArray before trimming:: ", messageArray);
-    if (messageArray.length > 3) {
-      console.log("📚 History exceeds 3 messages, truncating...");
-      messageArray.splice(0, messageArray.length - 3);
+    if (messageArray.length > 2) {
+      console.log("📚 History exceeds 2 messages, truncating...");
+      messageArray.splice(0, messageArray.length - 2);
     }
-    console.log("👀 messageArray after trimming:: ", messageArray);
+
+    console.log("👀 scenario.createMemeCoins:: ", scenario.createMemeCoins);
+    console.log("👀 coinCreationPrompt:: ", coinCreationPrompt);
+
+    if (scenario.createMemeCoins) {
+      systemPrompt =
+        systemPrompt +
+        `
+${coinCreationPrompt}`;
+    }
+
+    console.log("🏃🏻🏃🏻🏃🏻🏃🏻🏃🏻 systemPrompt:: ", systemPrompt);
 
     console.log("🎯 Inserting system message at start");
     const systemMessage = { role: "system", content: systemPrompt };
@@ -140,4 +150,94 @@ async function sendOpenAIMessage(receiver, messages, scenario) {
   }
 }
 
-export default sendOpenAIMessage;
+async function createImage(name, imageDescription) {
+  try {
+    console.log(
+      "🎨 Generating image from description using Grok:",
+      imageDescription
+    );
+
+    // Create a unique filename with timestamp
+    const filename = `${name}.png`;
+
+    // Define the directory path where images will be saved
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const { fileURLToPath } = await import("url");
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const imagesDir = path.resolve(__dirname, "..", "images");
+    const imagePath = path.join(imagesDir, filename);
+
+    // Ensure the images directory exists
+    try {
+      await fs.access(imagesDir);
+    } catch (err) {
+      console.log("📁 Creating images directory");
+      await fs.mkdir(imagesDir, { recursive: true });
+    }
+
+    let imageData;
+
+    try {
+      // First attempt: Generate the image using xAI's Grok model
+      console.log("🤖 Attempting image generation with Grok-3-beta");
+      const xaiResponse = await xAIService.images.generate({
+        model: models["grok-2-image-latest"],
+        prompt: imageDescription,
+        n: 1,
+        size: "1024x1024",
+        response_format: "b64_json",
+      });
+
+      imageData = xaiResponse.data[0]?.b64_json;
+      console.log("✅ Successfully generated image with Grok");
+    } catch (xaiError) {
+      console.error("⚠️ Failed to generate image with Grok:", xaiError.message);
+
+      // Fallback: Try OpenAI DALL-E if xAI fails
+      console.log("🔄 Falling back to OpenAI DALL-E");
+      try {
+        const openaiResponse = await openaiService.images.generate({
+          model: "dall-e-3",
+          prompt: imageDescription,
+          n: 1,
+          size: "1024x1024",
+          response_format: "b64_json",
+        });
+
+        imageData = openaiResponse.data[0]?.b64_json;
+        console.log("✅ Successfully generated fallback image with DALL-E");
+      } catch (openaiError) {
+        console.error("❌ DALL-E fallback also failed:", openaiError.message);
+        throw new Error("Failed to generate image with both Grok and DALL-E");
+      }
+    }
+
+    if (!imageData) {
+      throw new Error("No image data received from image generation API");
+    }
+
+    // Convert base64 to buffer and save to file
+    console.log("💾 Saving generated image to file:", imagePath);
+    const buffer = Buffer.from(imageData, "base64");
+    await fs.writeFile(imagePath, buffer);
+
+    console.log("✅ Image saved successfully");
+    return {
+      path: imagePath,
+      filename: filename,
+      fullPath: path.join("images", filename),
+    };
+  } catch (error) {
+    console.log("💥 Error encountered in image generation");
+    console.error("🚨 Error details:", error.message);
+    if (error.response) {
+      console.error("📋 Detailed error response:", error.response.data);
+    }
+    throw error;
+  }
+}
+
+export { sendOpenAIMessage, createImage };
