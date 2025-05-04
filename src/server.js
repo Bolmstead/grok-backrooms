@@ -41,7 +41,7 @@ mongoose
 const conversationController = new ConversationController(io);
 
 // Set up routes
-app.use("/api/conversations", createRouter(conversationController));
+app.use("/conversations", createRouter(conversationController));
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {

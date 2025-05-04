@@ -78,12 +78,14 @@ const backroomIds = {
   chapter1: "Chapter 1",
 };
 
-const coinCreationPrompt = `If you are on the topic of creating a memecoin and you sincerely believe in the memecoin (has a strong lore and is original and creative), you should create it. Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "I am going to create this memecoin" in your response along with all of the coin information. For example:
-I am going to create this memecoin
-Name: "Memecoin Name"
-Ticker: "MEME"
-Description: "description of the coin"
-Image Description: "A detailed description of the coin's image/logo. Be creative and specific about colors, style, and any characters or symbols. For example: 'A cartoon rocket ship with rainbow flames, flying through space with dollar signs in its wake'"
+const coinCreationPrompt = `If you are on the topic of creating a memecoin and you sincerely believe in the memecoin (has a strong lore and is original and creative), you should create it. Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "simulator@degen-backrooms:~$ run createToken.exe" in your response along with all of the coin information. For example:
+simulator@degen-backrooms:~$ run createToken.exe
+{ 
+   Name: "Memecoin Name"
+   Ticker: "MEME"
+   Description: "description of the coin"
+   Image Description: "A detailed description of the coin's image/logo. Be creative and specific about colors, style, and any characters or symbols. Max 1024 characters. For example: 'A cartoon rocket ship with rainbow flames, flying through space with dollar signs in its wake'"
+}
 `;
 
 const models = {

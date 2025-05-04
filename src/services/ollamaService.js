@@ -108,7 +108,7 @@ ${coinCreationPrompt}`;
 
     // Add system message about coin creation
 
-    console.log("⏳ Awaiting OpenAI response...");
+    console.log("⏳ Awaiting AI response...");
     const response = await openai.chat.completions.create({
       model,
       messages: messageArray,
@@ -150,7 +150,7 @@ ${coinCreationPrompt}`;
   }
 }
 
-async function createImage(name, imageDescription) {
+async function createImage(imageDescription, imageModel = "openai") {
   try {
     console.log(
       "🎨 Generating image from description using Grok:",
@@ -158,7 +158,7 @@ async function createImage(name, imageDescription) {
     );
 
     // Create a unique filename with timestamp
-    const filename = `${name}.png`;
+    const filename = `memecoinImage.png`;
 
     // Define the directory path where images will be saved
     const fs = await import("fs/promises");
@@ -181,34 +181,34 @@ async function createImage(name, imageDescription) {
     let imageData;
 
     try {
-      // First attempt: Generate the image using xAI's Grok model
-      console.log("🤖 Attempting image generation with Grok-3-beta");
-      const xaiResponse = await xAIService.images.generate({
-        model: models["grok-2-image-latest"],
+      const openaiResponse = await openaiService.images.generate({
+        model: "gpt-image-1",
         prompt: imageDescription,
         n: 1,
         size: "1024x1024",
         response_format: "b64_json",
       });
 
-      imageData = xaiResponse.data[0]?.b64_json;
-      console.log("✅ Successfully generated image with Grok");
+      imageData = openaiResponse.data[0]?.b64_json;
+      console.log("✅ Successfully generated fallback image with DALL-E");
     } catch (xaiError) {
       console.error("⚠️ Failed to generate image with Grok:", xaiError.message);
 
       // Fallback: Try OpenAI DALL-E if xAI fails
       console.log("🔄 Falling back to OpenAI DALL-E");
       try {
-        const openaiResponse = await openaiService.images.generate({
-          model: "dall-e-3",
+        // First attempt: Generate the image using xAI's Grok model
+        console.log("🤖 Attempting image generation with Grok");
+        const xaiResponse = await xAIService.images.generate({
+          model: models["grok-2-image-latest"],
           prompt: imageDescription,
           n: 1,
-          size: "1024x1024",
+          // size: "1024x1024", only used for open ai models I guess
           response_format: "b64_json",
         });
 
-        imageData = openaiResponse.data[0]?.b64_json;
-        console.log("✅ Successfully generated fallback image with DALL-E");
+        imageData = xaiResponse.data[0]?.b64_json;
+        console.log("✅ Successfully generated image with Grok");
       } catch (openaiError) {
         console.error("❌ DALL-E fallback also failed:", openaiError.message);
         throw new Error("Failed to generate image with both Grok and DALL-E");

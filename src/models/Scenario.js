@@ -76,6 +76,10 @@ const ScenarioSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  localLLM: {
+    type: Boolean,
+    required: false,
+  },
 });
 
 export default mongoose.model("Scenario", ScenarioSchema);

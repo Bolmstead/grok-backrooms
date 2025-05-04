@@ -1,9 +1,6 @@
 import Message from "../models/Message.js";
 import Scenario from "../models/Scenario.js";
-import {
-  sendOpenAIMessage,
-  createImage,
-} from "../services/sendOpenAIMessage.js";
+import { sendOpenAIMessage, createImage } from "../services/openAIService.js";
 import OpenAI from "openai";
 import createPumpfunCoin from "../helpers/createPumpfunCoin.js";
 import {
@@ -38,28 +35,26 @@ class ConversationController {
         )}...`
       );
 
-      // Parse coin details from message using improved regex patterns that handle multiline content
-      const nameMatch = content.match(/Name:\s*["']?(.*?)["']?(?:\r?\n|$)/);
-      const tickerMatch = content.match(/Ticker:\s*["']?(.*?)["']?(?:\r?\n|$)/);
+      // Parse coin details from message using improved regex patterns that handle multiline content and trailing pipes
+      const nameMatch = content.match(/Name:\s*["']?([^|]+?)["']?\s*\|/);
+      const tickerMatch = content.match(/Ticker:\s*["']?([^|]+?)["']?\s*\|/);
 
-      // For description and image description, look for the next heading or end of text
+      // For description and image description, look for content until the next pipe and handle multiline
       const descriptionRegex =
-        /Description:\s*(["']?)([^]*?)(?:\1)(?:\r?\n(?:Image Description:|$)|$)/;
+        /Description:\s*(["']?)((?:[^|]*?\|(?:\s*\n[^\n]*?)*?))(?:\s*\|)/;
       const descriptionMatch = content.match(descriptionRegex);
 
       const imageDescriptionRegex =
-        /Image Description:\s*(["']?)([^]*?)(?:\1)(?:\r?\n\w+:|\r?\n$|$)/;
+        /Image Description:\s*(["']?)((?:[^|]*?\|(?:\s*\n[^\n]*?)*?))(?:\s*\|)/;
       const imageDescriptionMatch = content.match(imageDescriptionRegex);
 
       // Extract raw values first for logging
       const rawName = nameMatch?.[1]?.trim();
       const rawTicker = tickerMatch?.[1]?.trim();
-      const rawDescription = (
-        descriptionMatch?.[2] || descriptionMatch?.[1]
-      )?.trim();
-      const rawImageDescription = (
-        imageDescriptionMatch?.[2] || imageDescriptionMatch?.[1]
-      )?.trim();
+      const rawDescription = descriptionMatch?.[2]?.replace(/\|/g, "").trim();
+      const rawImageDescription = imageDescriptionMatch?.[2]
+        ?.replace(/\|/g, "")
+        .trim();
 
       // Extract values, clean them by removing quotes, and trim whitespace
       const cleanValue = (value) => {
@@ -216,7 +211,7 @@ ${result?.output || "Unable to process the memecoin creation request"}
         this.ai2Context = scenarioInDB.startingContextAI2;
         this.isRunning = true;
       }
-      this.io.emit("conversationStarted", {});
+      this.io.emit("conversationStarted", { scenarioId, live: true });
 
       let ai1APIKey, ai2APIKey, ai1BaseURL, ai2BaseURL;
 
@@ -244,27 +239,37 @@ ${result?.output || "Unable to process the memecoin creation request"}
       }
 
       console.log("🤖 Initializing AI services...");
-      if (ai2APIKey === ai1APIKey) {
-        this.ai1Service = new OpenAI({
-          apiKey: ai1APIKey,
-          baseURL: ai1BaseURL,
-        });
-        this.ai2Service = this.ai1Service;
-      } else {
-        this.ai1Service = new OpenAI({
-          apiKey: ai1APIKey,
-          baseURL: ai1BaseURL,
-        });
-        this.ai2Service = new OpenAI({
-          apiKey: ai2APIKey,
-          baseURL: ai2BaseURL,
-        });
+      if (
+        scenarioInDB.localLLM === false &&
+        (scenarioInDB.ai2Model.includes("grok") ||
+          scenarioInDB.ai2Model.includes("claude") ||
+          scenarioInDB.ai1Model.includes("grok") ||
+          scenarioInDB.ai1Model.includes("claude"))
+      ) {
+        if (ai2APIKey === ai1APIKey) {
+          this.ai1Service = new OpenAI({
+            apiKey: ai1APIKey,
+            baseURL: ai1BaseURL,
+          });
+          this.ai2Service = this.ai1Service;
+        } else {
+          this.ai1Service = new OpenAI({
+            apiKey: ai1APIKey,
+            baseURL: ai1BaseURL,
+          });
+          this.ai2Service = new OpenAI({
+            apiKey: ai2APIKey,
+            baseURL: ai2BaseURL,
+          });
+        }
+      } else if (scenarioInDB.localLLM) {
+        console.log("🤖 Initializing local LLM services...");
       }
 
       console.log("🎯 Starting conversation loop...");
       this.continueConversation();
 
-      return true;
+      return scenarioInDB.scenarioId;
     } catch (error) {
       console.error("❌ Error starting conversation:", error);
       throw error;
@@ -310,9 +315,7 @@ ${result?.output || "Unable to process the memecoin creation request"}
       if (
         this.coinCreationEnabled &&
         savedAI1Message.content &&
-        /\bI am going to create this (token|coin|memecoin|cryptocurrency)\b/i.test(
-          savedAI1Message.content
-        )
+        /\brun createToken.exe\b/i.test(savedAI1Message.content)
       ) {
         console.log(
           "🔍 Detected explicit coin creation intent in AI1's message"
@@ -347,9 +350,7 @@ ${result?.output || "Unable to process the memecoin creation request"}
         if (
           this.coinCreationEnabled &&
           savedAI2Message.content &&
-          /\bI am going to create this (token|coin|memecoin|cryptocurrency)\b/i.test(
-            savedAI2Message.content
-          )
+          /\brun createToken.exe\b/i.test(savedAI2Message.content)
         ) {
           console.log(
             "🔍 Detected explicit coin creation intent in AI2's message"

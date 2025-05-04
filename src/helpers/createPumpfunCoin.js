@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createImage } from "../services/sendOpenAIMessage.js";
+import { createImage } from "../services/openAIService.js";
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,7 +12,10 @@ const __dirname = path.dirname(__filename);
 const RPC_ENDPOINT = process.env.HELIUS_RPC_URL;
 const web3Connection = new Connection(RPC_ENDPOINT, "confirmed");
 
-export default async function createPumpfunCoin(coinData) {
+export default async function createPumpfunCoin(
+  coinData,
+  imageModel = "openai"
+) {
   console.log("🚀 Starting PumpFun Coin Creation Process...");
 
   const signerKeyPair = Keypair.fromSecretKey(
@@ -31,19 +34,35 @@ export default async function createPumpfunCoin(coinData) {
     throw new Error("Missing required coin details");
   }
 
-  const imageResult = await createImage(name, imageDescription);
-  const imagePath = imageResult.fullPath;
+  const imageResult = await createImage(imageDescription, imageModel);
+  let imagePath = imageResult.fullPath;
 
   // Define token metadata
   const formData = new FormData();
-  // const imagePath = path.join(__dirname, "..", "images", imageFileName);
   console.log(`🖼️ Loading image from: ${imagePath}`);
 
   // Check if image file exists
   try {
     await fs.promises.access(imagePath);
   } catch (error) {
-    throw new Error(`Image file not found at path: ${imagePath}`);
+    console.error(`⚠️ Image not found at path: ${imagePath}`);
+    // Fallback to relative path if the full path doesn't work
+    const relativePath = path.join(
+      __dirname,
+      "..",
+      "images",
+      "memecoinImage.png"
+    );
+    console.log(`🔍 Trying alternate path: ${relativePath}`);
+    try {
+      await fs.promises.access(relativePath);
+      console.log(`✅ Found image at alternate path`);
+      imagePath = relativePath;
+    } catch (altError) {
+      throw new Error(
+        `Image file not found at path: ${imagePath} or ${relativePath}`
+      );
+    }
   }
 
   const imageBuffer = await fs.promises.readFile(imagePath);
@@ -51,6 +70,10 @@ export default async function createPumpfunCoin(coinData) {
   formData.append("name", name);
   formData.append("symbol", ticker);
   formData.append("description", description);
+  // Make sure these variables are defined or use empty strings as fallbacks
+  const twitter = coinData.twitter || "";
+  const telegram = coinData.telegram || "";
+  const website = coinData.website || "";
   formData.append("twitter", twitter);
   formData.append("telegram", telegram);
   formData.append("website", website);
