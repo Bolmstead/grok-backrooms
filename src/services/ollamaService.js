@@ -73,7 +73,15 @@ async function sendOllamaMessage(receiver, messages, scenario) {
     const systemMessage = { role: "system", content: systemPrompt };
     messageArray.unshift(systemMessage);
 
+    const chatObject = {
+      model,
+      messages: messageArray,
+      stream: false,
+    };
+
+    console.log("🧞‍♂️🧞‍♂️🧞‍♂️ chatObject:: ", chatObject);
     console.log("🚀 Sending chat request to Ollama");
+
     // Using the Ollama SDK to send the chat request
     const response = await ollama.chat({
       model,

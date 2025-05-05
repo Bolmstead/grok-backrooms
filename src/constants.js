@@ -1,5 +1,5 @@
-const delayBetweenMessages = 500;
-const numOfPreviousConversations = 30;
+const delayBetweenMessages = 1000;
+const numOfPreviousConversations = 10;
 
 const coinCreationPrompt = `On very very rare occasions, create a memecoin. You must be already on the topic of creating a memecoin and you sincerely believe in the meme (has a strong lore and is original and creative). Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "simulator@gork-backrooms:~$ run createToken.exe" in your response along with all of the coin information. For example:
 simulator@gork-backrooms:~$ run createToken.exe
