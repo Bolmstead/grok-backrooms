@@ -11,9 +11,9 @@ import {
 import { sendOllamaMessage } from "../services/ollamaService.js";
 
 class ConversationController {
-  constructor(io) {
+  constructor() {
     console.log("🎭 Initializing ConversationController");
-    this.io = io;
+
     this.ai1Context = [];
     this.ai2Context = [];
     this.isRunning = false;
@@ -28,6 +28,7 @@ class ConversationController {
       console.log("💰 Starting coin creation process for", aiName);
       // Extract potential coin information from message content
       const content = message.content || "";
+      const id = message._id;
 
       // Updated regex patterns to handle JSON-like format
       const nameMatch = content.match(/Name:\s*["']?([^"'\n}]+)["']?/);
@@ -91,19 +92,26 @@ Required information missing. Please specify Name, Ticker, and Description.
           content: errorMessage,
         });
         await errorMessageDB.save();
-        this.io.emit("newMessage", {
-          ...errorMessageDB._doc,
-        });
+
         return { success: false, message: "Missing required coin information" };
       }
 
       console.log("🎯 Proceeding with coin creation for", name);
+
+      const twitterLink = "https://x.com/thegorkbackrms";
+      const telegramLink = "https://t.me/+WahMdi-cgTI2YTcx";
+      const websiteLink = id
+        ? `https://thegorkbackrooms.com/conversation/${id}`
+        : "https://thegorkbackrooms.com";
       // Use the direct createMemecoin function with extracted parameters
       const result = await createPumpfunCoin({
         name,
         ticker,
         description,
         imageDescription,
+        twitterLink,
+        telegramLink,
+        websiteLink,
       });
       console.log("💰 Coin creation result:", result);
 
@@ -128,9 +136,7 @@ Memecoin Creation Failed
         content: newCoinMessage,
       });
       await newCoinMessageDB.save();
-      this.io.emit("newMessage", {
-        ...newCoinMessageDB._doc,
-      });
+
       if (aiName === "ai1") {
         this.ai1Context.push({
           role: "assistant",
@@ -154,10 +160,7 @@ Memecoin Creation Failed
       return result;
     } catch (error) {
       console.error("🔥 Error in handleCoinCreation:", error);
-      this.io.emit("coinCreationError", {
-        aiName,
-        error: error.message,
-      });
+
       throw error;
     }
   }
@@ -200,7 +203,6 @@ Memecoin Creation Failed
         this.ai2Context = scenarioInDB.startingContextAI2;
         this.isRunning = true;
       }
-      this.io.emit("conversationStarted", { scenarioId, live: true });
 
       let ai1APIKey, ai2APIKey, ai1BaseURL, ai2BaseURL;
 
@@ -311,9 +313,6 @@ Memecoin Creation Failed
         content: savedAI1Message.content,
       });
 
-      this.io.emit("newMessage", {
-        ...savedAI1Message._doc,
-      });
       // Alternative detection method - check if message content contains coin creation keywords
       if (
         this.coinCreationEnabled &&
@@ -354,10 +353,6 @@ Memecoin Creation Failed
           content: savedAI2Message.content,
         });
 
-        this.io.emit("newMessage", {
-          ...savedAI2Message._doc,
-        });
-
         // Alternative detection method - check if message content contains coin creation keywords
         if (
           this.coinCreationEnabled &&
@@ -374,9 +369,6 @@ Memecoin Creation Failed
       }, delayBetweenMessages);
     } catch (error) {
       console.error("💥 Error in continueConversation:", error);
-      this.io.emit("conversationError", {
-        error: error.message,
-      });
 
       setTimeout(() => {
         this.continueConversation();

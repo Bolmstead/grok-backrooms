@@ -195,7 +195,7 @@ async function createImage(imageDescription, imageModel = "openai") {
       console.error("⚠️ Failed to generate image with Grok:", xaiError.message);
 
       // Fallback: Try OpenAI DALL-E if xAI fails
-      console.log("🔄 Falling back to OpenAI DALL-E");
+      console.log("🔄 Falling back to xAI Grok");
       try {
         // First attempt: Generate the image using xAI's Grok model
         console.log("🤖 Attempting image generation with Grok");

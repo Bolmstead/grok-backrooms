@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
-import { Server } from "socket.io";
 import mongoose from "mongoose";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -20,12 +19,6 @@ dotenv.config();
 // Set up Express app
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
-});
 
 // Middleware
 app.use(express.json());
@@ -38,19 +31,10 @@ mongoose
   .catch((err) => console.error("MongoDB connection error:", err));
 
 // Initialize the conversation controller with socket.io
-const conversationController = new ConversationController(io);
+const conversationController = new ConversationController();
 
 // Set up routes
 app.use("/conversations", createRouter(conversationController));
-
-// Socket.IO connection handling
-io.on("connection", (socket) => {
-  console.log("New client connected");
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-  });
-});
 
 // Start the server
 const PORT = process.env.PORT || 6969;

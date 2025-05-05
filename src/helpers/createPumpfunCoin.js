@@ -83,9 +83,9 @@ export default async function createPumpfunCoin(
   formData.append("symbol", ticker);
   formData.append("description", description);
   // Make sure these variables are defined or use empty strings as fallbacks
-  const twitter = coinData.twitter || "";
-  const telegram = coinData.telegram || "";
-  const website = coinData.website || "";
+  const twitter = coinData.twitterLink || "";
+  const telegram = coinData.telegramLink || "";
+  const website = coinData.websiteLink || "";
   formData.append("twitter", twitter);
   formData.append("telegram", telegram);
   formData.append("website", website);
@@ -163,16 +163,3 @@ export default async function createPumpfunCoin(
     throw error;
   }
 }
-
-// Example usage
-const coinData = {
-  name: "Test Coin",
-  symbol: "TEST",
-  description: "Test Description",
-  twitter: "https://twitter.com/test",
-  telegram: "https://t.me/test",
-  website: "https://test.com",
-  imageFileName: "grok.png",
-};
-
-// createPumpfunCoin(coinData);
