@@ -17,6 +17,7 @@
     "@langchain/langgraph": "^0.2.65",
     "@langchain/openai": "^0.5.7",
     "@solana/web3.js": "^1.98.0",
+    "agent-twitter-client": "^0.0.18",
     "bs58": "^6.0.0",
     "dotenv": "^16.4.7",
     "express": "^4.18.2",

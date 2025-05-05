@@ -6,6 +6,7 @@ import {
   numOfPreviousConversations,
 } from "../constants.js";
 dotenv.config();
+import { sendTweet } from "../helpers/twitter.js";
 
 // Configure the Ollama client (default connects to localhost:11434)
 // const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
@@ -96,6 +97,15 @@ async function sendOllamaMessage(receiver, messages, scenario) {
 
     console.log("💾 Saving message to database");
     await dbMessage.save();
+
+    const tweetMessage = `<${dbMessage.messageCreatedBy}:${dbMessage._id}>
+${dbMessage.content}`;
+
+    // try {
+    //   await sendTweet(tweetMessage);
+    // } catch (error) {
+    //   console.error("❌ Error sending tweet:", error);
+    // }
 
     return dbMessage;
   } catch (error) {

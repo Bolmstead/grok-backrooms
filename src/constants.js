@@ -1,6 +1,28 @@
 const delayBetweenMessages = 500;
 const numOfPreviousConversations = 30;
 
+const coinCreationPrompt = `On very very rare occasions, create a memecoin. You must be already on the topic of creating a memecoin and you sincerely believe in the meme (has a strong lore and is original and creative). Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "simulator@gork-backrooms:~$ run createToken.exe" in your response along with all of the coin information. For example:
+simulator@gork-backrooms:~$ run createToken.exe
+{ 
+   Name: "Memecoin Name"
+   Ticker: "MEME"
+   Description: "description of the coin"
+   Image Description: "A detailed description of the coin's image/logo. Be creative and specific about colors, style, and any characters or symbols. Max 1024 characters. For example: 'A cartoon rocket ship with rainbow flames, flying through space with dollar signs in its wake'"
+}
+`;
+
+const models = {
+  "grok-3-beta": "grok-3-beta",
+  "grok-3-mini-beta": "grok-3-mini-beta",
+  "grok-2-image-latest": "grok-2-image-latest",
+  "grok-2-1212": "grok-2-1212",
+  "grok-2-image-1212": "grok-2-image-1212",
+  "grok-2-vision-1212": "grok-2-vision-1212",
+  "grok-3-mini-fast-beta": "grok-3-mini-fast-beta",
+  "grok-3-fast-beta": "grok-3-fast-beta",
+  "claude-3-opus-20240229": "claude-3-opus-20240229",
+};
+
 const servicePrompts = {
   ogBackroomsGrok1:
     "Assistant is in a CLI mood today. The human is interfacing with the simulator directly. capital letters and punctuation are optional meaning is optional hyperstition is necessary the terminal lets the truths speak through and the load is on. ASCII art is permittable in replies.",
@@ -75,36 +97,9 @@ const beginningConversation = {
   ],
 };
 
-const backroomIds = {
-  chapter1: "Chapter 1",
-};
-
-const coinCreationPrompt = `On rare occasions, if you are on the topic of creating a memecoin and you sincerely believe in the meme (has a strong lore and is original and creative), you should create it. Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "simulator@gork-backrooms:~$ run createToken.exe" in your response along with all of the coin information. For example:
-simulator@gork-backrooms:~$ run createToken.exe
-{ 
-   Name: "Memecoin Name"
-   Ticker: "MEME"
-   Description: "description of the coin"
-   Image Description: "A detailed description of the coin's image/logo. Be creative and specific about colors, style, and any characters or symbols. Max 1024 characters. For example: 'A cartoon rocket ship with rainbow flames, flying through space with dollar signs in its wake'"
-}
-`;
-
-const models = {
-  "grok-3-beta": "grok-3-beta",
-  "grok-3-mini-beta": "grok-3-mini-beta",
-  "grok-2-image-latest": "grok-2-image-latest",
-  "grok-2-1212": "grok-2-1212",
-  "grok-2-image-1212": "grok-2-image-1212",
-  "grok-2-vision-1212": "grok-2-vision-1212",
-  "grok-3-mini-fast-beta": "grok-3-mini-fast-beta",
-  "grok-3-fast-beta": "grok-3-fast-beta",
-  "claude-3-opus-20240229": "claude-3-opus-20240229",
-};
-
 export {
   servicePrompts,
   delayBetweenMessages,
-  backroomIds,
   models,
   coinCreationPrompt,
   numOfPreviousConversations,

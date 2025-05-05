@@ -6,7 +6,6 @@ import createPumpfunCoin from "../helpers/createPumpfunCoin.js";
 import {
   servicePrompts,
   delayBetweenMessages,
-  backroomIds,
   numOfPreviousConversations,
 } from "../constants.js";
 import { sendOllamaMessage } from "../services/ollamaService.js";
@@ -165,7 +164,7 @@ Memecoin Creation Failed
 
   async startNewConversation(scenario) {
     console.log("🎪 Starting new conversation");
-    // Initialize conversation contexts for both Groks
+    // Initialize conversation contexts for both ai's
     try {
       this.isRunning = true;
       const { scenarioId } = scenario;
