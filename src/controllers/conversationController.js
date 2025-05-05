@@ -7,11 +7,13 @@ import {
   servicePrompts,
   delayBetweenMessages,
   backroomIds,
+  numOfPreviousConversations,
 } from "../constants.js";
+import { sendOllamaMessage } from "../services/ollamaService.js";
 
 class ConversationController {
   constructor(io) {
-    console.log("🎮 Initializing Conversation Controller...");
+    console.log("🎭 Initializing ConversationController");
     this.io = io;
     this.ai1Context = [];
     this.ai2Context = [];
@@ -24,37 +26,39 @@ class ConversationController {
 
   async handleCoinCreation(aiName, message) {
     try {
-      console.log(`🪙 ${aiName} is requesting coin creation`);
-
+      console.log("💰 Starting coin creation process for", aiName);
       // Extract potential coin information from message content
       const content = message.content || "";
-      console.log(
-        `📝 Parsing message content for coin details: ${content.substring(
-          0,
-          100
-        )}...`
+
+      // Updated regex patterns to handle JSON-like format
+      const nameMatch = content.match(/Name:\s*["']?([^"'\n}]+)["']?/);
+      const tickerMatch = content.match(/Ticker:\s*["']?([^"'\n}]+)["']?/);
+      const descriptionMatch = content.match(
+        /Description:\s*["']?([^"'\n}]+)["']?/
+      );
+      const imageDescriptionMatch = content.match(
+        /Image Description:\s*["']?([^"'\n}]+)["']?/
       );
 
-      // Parse coin details from message using improved regex patterns that handle multiline content and trailing pipes
-      const nameMatch = content.match(/Name:\s*["']?([^|]+?)["']?\s*\|/);
-      const tickerMatch = content.match(/Ticker:\s*["']?([^|]+?)["']?\s*\|/);
-
-      // For description and image description, look for content until the next pipe and handle multiline
-      const descriptionRegex =
-        /Description:\s*(["']?)((?:[^|]*?\|(?:\s*\n[^\n]*?)*?))(?:\s*\|)/;
-      const descriptionMatch = content.match(descriptionRegex);
-
-      const imageDescriptionRegex =
-        /Image Description:\s*(["']?)((?:[^|]*?\|(?:\s*\n[^\n]*?)*?))(?:\s*\|)/;
-      const imageDescriptionMatch = content.match(imageDescriptionRegex);
+      console.log("🔍 Regex matches:", {
+        nameMatch: nameMatch?.[1],
+        tickerMatch: tickerMatch?.[1],
+        descriptionMatch: descriptionMatch?.[1],
+        imageDescriptionMatch: imageDescriptionMatch?.[1],
+      });
 
       // Extract raw values first for logging
       const rawName = nameMatch?.[1]?.trim();
       const rawTicker = tickerMatch?.[1]?.trim();
-      const rawDescription = descriptionMatch?.[2]?.replace(/\|/g, "").trim();
-      const rawImageDescription = imageDescriptionMatch?.[2]
-        ?.replace(/\|/g, "")
-        .trim();
+      const rawDescription = descriptionMatch?.[1]?.trim();
+      const rawImageDescription = imageDescriptionMatch?.[1]?.trim();
+
+      console.log("📊 Extracted coin details:", {
+        name: rawName,
+        ticker: rawTicker,
+        description: rawDescription?.substring(0, 50) + "...",
+        imageDescription: rawImageDescription?.substring(0, 50) + "...",
+      });
 
       // Extract values, clean them by removing quotes, and trim whitespace
       const cleanValue = (value) => {
@@ -72,21 +76,9 @@ class ConversationController {
       const description = cleanValue(rawDescription);
       const imageDescription = cleanValue(rawImageDescription);
 
-      console.log(`🪙 Extracted coin details (raw -> cleaned):
-      Name: "${rawName}" -> "${name}"
-      Ticker: "${rawTicker}" -> "${ticker}"
-      Description (start): "${rawDescription?.substring(
-        0,
-        30
-      )}..." -> "${description?.substring(0, 30)}..."
-      Image (start): "${rawImageDescription?.substring(
-        0,
-        30
-      )}..." -> "${imageDescription?.substring(0, 30)}..."`);
-
       // Check if we have the required fields
       if (!name || !ticker || !description) {
-        console.log("⚠️ Missing required coin details");
+        console.log("❌ Missing required coin information");
         // Create a message informing that coin creation failed due to missing details
         const errorMessage = `
 --------------------------------
@@ -106,32 +98,29 @@ Required information missing. Please specify Name, Ticker, and Description.
         return { success: false, message: "Missing required coin information" };
       }
 
+      console.log("🎯 Proceeding with coin creation for", name);
       // Use the direct createMemecoin function with extracted parameters
-      console.log("🤖 Directly creating memecoin with extracted parameters");
       const result = await createPumpfunCoin({
         name,
         ticker,
         description,
         imageDescription,
       });
-
-      console.log("🚀 Memecoin creation result:", result);
+      console.log("💰 Coin creation result:", result);
 
       let newCoinMessage;
-      if (result && result.success) {
-        newCoinMessage = `
---------------------------------
+      if (result) {
+        console.log("✨ Coin creation successful");
+        newCoinMessage = `--------------------------------
 Memecoin Creation Success
-${result.output}
---------------------------------
-`;
+tx signature: ${result}
+--------------------------------`;
       } else {
-        newCoinMessage = `
---------------------------------
+        console.log("💥 Coin creation failed");
+        newCoinMessage = `--------------------------------
 Memecoin Creation Failed
-${result?.output || "Unable to process the memecoin creation request"}
---------------------------------
-`;
+"Unable to process the memecoin creation request"
+--------------------------------`;
       }
 
       const newCoinMessageDB = new Message({
@@ -165,7 +154,7 @@ ${result?.output || "Unable to process the memecoin creation request"}
 
       return result;
     } catch (error) {
-      console.error(`❌ Error creating coin for ${aiName}:`, error);
+      console.error("🔥 Error in handleCoinCreation:", error);
       this.io.emit("coinCreationError", {
         aiName,
         error: error.message,
@@ -175,28 +164,29 @@ ${result?.output || "Unable to process the memecoin creation request"}
   }
 
   async startNewConversation(scenario) {
-    console.log("🚀 Starting new conversation with scenario:", scenario);
+    console.log("🎪 Starting new conversation");
     // Initialize conversation contexts for both Groks
     try {
       this.isRunning = true;
       const { scenarioId } = scenario;
-      console.log("📝 Processing scenario ID:", scenarioId);
       let scenarioInDB;
-      console.log(`💫 New conversation initialized!`);
       scenarioInDB = await Scenario.findOne({
         scenarioId,
       });
       if (!scenarioInDB) {
-        console.log("🆕 Creating new scenario in database...");
+        console.log("📝 Creating new scenario in database");
         scenarioInDB = await Scenario.create(scenario);
       }
       this.scenario = scenarioInDB;
       const conversationHistory = await this.getConversationHistory(
         scenarioInDB
       );
-      console.log("📚 Retrieved conversation history:", conversationHistory);
+      console.log(
+        "🌀 ~ ConversationController ~ startNewConversation ~ conversationHistory:",
+        conversationHistory
+      );
       if (conversationHistory.length > 0) {
-        console.log("🔄 Loading existing conversation context...");
+        console.log("📚 Loading existing conversation history");
         this.ai1Context = conversationHistory.map((message) => ({
           role: message.messageCreatedBy === "ai1" ? "user" : "assistant",
           content: message.content,
@@ -206,7 +196,7 @@ ${result?.output || "Unable to process the memecoin creation request"}
           content: message.content,
         }));
       } else {
-        console.log("🌟 Setting up fresh conversation context...");
+        console.log("🎨 Using initial context from scenario");
         this.ai1Context = scenarioInDB.startingContextAI1;
         this.ai2Context = scenarioInDB.startingContextAI2;
         this.isRunning = true;
@@ -215,30 +205,34 @@ ${result?.output || "Unable to process the memecoin creation request"}
 
       let ai1APIKey, ai2APIKey, ai1BaseURL, ai2BaseURL;
 
-      console.log("🔑 Configuring API settings...");
       if (scenarioInDB.ai1Model.includes("grok")) {
+        console.log("🤖 Using Grok for AI1");
         ai1APIKey = process.env.XAI_API_KEY;
         ai1BaseURL = "https://api.x.ai/v1";
       } else if (scenarioInDB.ai1Model.includes("claude")) {
+        console.log("🧠 Using Claude for AI1");
         ai1APIKey = process.env.CLAUDE_API_KEY;
         ai1BaseURL = "https://api.anthropic.com/v1";
       } else if (scenarioInDB.ai1Model.includes("openai")) {
+        console.log("🤖 Using OpenAI for AI1");
         ai1APIKey = process.env.OPENAI_API_KEY;
         ai1BaseURL = "https://api.openai.com/v1";
       }
 
       if (scenarioInDB.ai2Model.includes("grok")) {
+        console.log("🤖 Using Grok for AI2");
         ai2APIKey = process.env.XAI_API_KEY;
         ai2BaseURL = "https://api.x.ai/v1";
       } else if (scenarioInDB.ai2Model.includes("claude")) {
+        console.log("🧠 Using Claude for AI2");
         ai2APIKey = process.env.CLAUDE_API_KEY;
         ai2BaseURL = "https://api.anthropic.com/v1";
       } else if (scenarioInDB.ai2Model.includes("openai")) {
+        console.log("🤖 Using OpenAI for AI2");
         ai2APIKey = process.env.OPENAI_API_KEY;
         ai2BaseURL = "https://api.openai.com/v1";
       }
 
-      console.log("🤖 Initializing AI services...");
       if (
         scenarioInDB.localLLM === false &&
         (scenarioInDB.ai2Model.includes("grok") ||
@@ -247,12 +241,14 @@ ${result?.output || "Unable to process the memecoin creation request"}
           scenarioInDB.ai1Model.includes("claude"))
       ) {
         if (ai2APIKey === ai1APIKey) {
+          console.log("🔑 Using same API key for both AIs");
           this.ai1Service = new OpenAI({
             apiKey: ai1APIKey,
             baseURL: ai1BaseURL,
           });
           this.ai2Service = this.ai1Service;
         } else {
+          console.log("🔑 Using different API keys for AIs");
           this.ai1Service = new OpenAI({
             apiKey: ai1APIKey,
             baseURL: ai1BaseURL,
@@ -262,41 +258,50 @@ ${result?.output || "Unable to process the memecoin creation request"}
             baseURL: ai2BaseURL,
           });
         }
-      } else if (scenarioInDB.localLLM) {
-        console.log("🤖 Initializing local LLM services...");
       }
 
-      console.log("🎯 Starting conversation loop...");
       this.continueConversation();
 
       return scenarioInDB.scenarioId;
     } catch (error) {
-      console.error("❌ Error starting conversation:", error);
+      console.error("💥 Error in startNewConversation:", error);
       throw error;
     }
   }
 
   async continueConversation() {
     if (!this.isRunning) {
-      console.log("⏸️ Conversation paused");
+      console.log("⏸️ Conversation is not running");
       return;
     }
 
     try {
-      console.log("🔄 Trimming conversation context...");
+      console.log("🔄 Continuing conversation");
       // Keep only the last 10 messages for context
-      this.ai1Context = this.ai1Context.slice(-10);
-      this.ai2Context = this.ai2Context.slice(-10);
+      this.ai1Context = this.ai1Context.slice(-numOfPreviousConversations);
+      this.ai2Context = this.ai2Context.slice(-numOfPreviousConversations);
 
       // ai1 generates a response
-      console.log("🤖 AI #1 thinking...");
-      console.log("📜 AI #1 context:", this.ai1Context);
-      const savedAI1Message = await sendOpenAIMessage(
-        "ai1",
-        this.ai1Context,
-        this.scenario
+      let savedAI1Message;
+      console.log(
+        "🔮 ~ ConversationController ~ continueConversation ~ this.ai1Context:",
+        this.ai1Context
       );
-      console.log("💬 Adding AI #1's response to context...");
+      if (this.scenario.localLLM) {
+        console.log("🏠 Using local LLM for AI1");
+        savedAI1Message = await sendOllamaMessage(
+          "ai1",
+          this.ai1Context,
+          this.scenario
+        );
+      } else {
+        console.log("☁️ Using cloud LLM for AI1");
+        savedAI1Message = await sendOpenAIMessage(
+          "ai1",
+          this.ai1Context,
+          this.scenario
+        );
+      }
       // Add ai1's response to both contexts
       this.ai1Context.push({
         role: "assistant",
@@ -307,7 +312,6 @@ ${result?.output || "Unable to process the memecoin creation request"}
         content: savedAI1Message.content,
       });
 
-      console.log(`📢 AI #1 says: ${savedAI1Message.content}`);
       this.io.emit("newMessage", {
         ...savedAI1Message._doc,
       });
@@ -317,21 +321,31 @@ ${result?.output || "Unable to process the memecoin creation request"}
         savedAI1Message.content &&
         /\brun createToken.exe\b/i.test(savedAI1Message.content)
       ) {
-        console.log(
-          "🔍 Detected explicit coin creation intent in AI1's message"
-        );
+        console.log("🪙 Detected coin creation request in AI1 message");
         await this.handleCoinCreation("ai1", savedAI1Message);
       }
 
       setTimeout(async () => {
-        console.log("🤖 AI #2 thinking...");
-        console.log("📜 AI #2 context:", this.ai2Context);
-        const savedAI2Message = await sendOpenAIMessage(
-          "ai2",
-          this.ai2Context,
-          this.scenario
+        let savedAI2Message;
+        console.log(
+          "🧠 ~ ConversationController ~ continueConversation ~ this.ai2Context:",
+          this.ai2Context
         );
-        console.log("💬 Adding AI #2's response to context...");
+        if (this.scenario.localLLM) {
+          console.log("🏠 Using local LLM for AI2");
+          savedAI2Message = await sendOllamaMessage(
+            "ai2",
+            this.ai2Context,
+            this.scenario
+          );
+        } else {
+          console.log("☁️ Using cloud LLM for AI2");
+          savedAI2Message = await sendOpenAIMessage(
+            "ai2",
+            this.ai2Context,
+            this.scenario
+          );
+        }
         this.ai1Context.push({
           role: "user",
           content: savedAI2Message.content,
@@ -341,7 +355,6 @@ ${result?.output || "Unable to process the memecoin creation request"}
           content: savedAI2Message.content,
         });
 
-        console.log(`📢 AI #2 says: ${savedAI2Message.content}`);
         this.io.emit("newMessage", {
           ...savedAI2Message._doc,
         });
@@ -352,24 +365,20 @@ ${result?.output || "Unable to process the memecoin creation request"}
           savedAI2Message.content &&
           /\brun createToken.exe\b/i.test(savedAI2Message.content)
         ) {
-          console.log(
-            "🔍 Detected explicit coin creation intent in AI2's message"
-          );
+          console.log("🪙 Detected coin creation request in AI2 message");
           await this.handleCoinCreation("ai2", savedAI2Message);
         }
 
-        console.log("⏳ Waiting before next exchange...");
         setTimeout(() => {
           this.continueConversation();
         }, delayBetweenMessages);
       }, delayBetweenMessages);
     } catch (error) {
-      console.error("❌ Conversation error:", error);
+      console.error("💥 Error in continueConversation:", error);
       this.io.emit("conversationError", {
         error: error.message,
       });
 
-      console.log("🔄 Attempting to recover from error...");
       setTimeout(() => {
         this.continueConversation();
       }, delayBetweenMessages);
@@ -378,17 +387,17 @@ ${result?.output || "Unable to process the memecoin creation request"}
 
   async getConversationHistory(scenario) {
     try {
-      console.log("📚 Fetching conversation history...");
+      console.log("📜 Fetching conversation history");
       const messages = await Message.find({
         scenario,
         messageCreatedBy: { $ne: "status" },
       })
         .sort({ timestamp: 1 })
         .limit(5);
-      console.log(`✨ Found ${messages.length} historical messages`);
+      console.log("📚 Found", messages.length, "messages in history");
       return messages;
     } catch (error) {
-      console.error("❌ Error fetching conversation history:", error);
+      console.error("💥 Error in getConversationHistory:", error);
       throw error;
     }
   }

@@ -18,22 +18,30 @@ export default async function createPumpfunCoin(
 ) {
   console.log("🚀 Starting PumpFun Coin Creation Process...");
 
+  console.log("🔑 Loading signer keypair");
   const signerKeyPair = Keypair.fromSecretKey(
     bs58.decode(process.env.GROK_PRIVATE_KEY)
   );
-  console.log("🔑 Signer keypair loaded successfully");
+  console.log("✅ Signer keypair loaded successfully");
 
   // Generate a random keypair for token
+  console.log("🎲 Generating new mint keypair");
   const mintKeypair = Keypair.generate();
-  console.log("🎲 Generated new mint keypair");
+  console.log("✅ Generated new mint keypair");
 
   const { name, ticker, description, imageDescription } = coinData;
+  console.log("🚀 ~ name:", name);
+  console.log("🚀 ~ ticker:", ticker);
+  console.log("🚀 ~ description:", description);
+  console.log("🚀 ~ imageDescription:", imageDescription);
 
   console.log(`📝 Processing token metadata for ${name} (${ticker})`);
   if (!name || !ticker || !description || !imageDescription) {
+    console.error("❌ Missing required coin details");
     throw new Error("Missing required coin details");
   }
 
+  console.log("🎨 Creating image for token");
   const imageResult = await createImage(imageDescription, imageModel);
   let imagePath = imageResult.fullPath;
 
@@ -43,7 +51,9 @@ export default async function createPumpfunCoin(
 
   // Check if image file exists
   try {
+    console.log("🔍 Checking if image file exists");
     await fs.promises.access(imagePath);
+    console.log("✅ Image file found");
   } catch (error) {
     console.error(`⚠️ Image not found at path: ${imagePath}`);
     // Fallback to relative path if the full path doesn't work
@@ -59,12 +69,14 @@ export default async function createPumpfunCoin(
       console.log(`✅ Found image at alternate path`);
       imagePath = relativePath;
     } catch (altError) {
+      console.error("❌ Image not found at either path");
       throw new Error(
         `Image file not found at path: ${imagePath} or ${relativePath}`
       );
     }
   }
 
+  console.log("📦 Reading image file");
   const imageBuffer = await fs.promises.readFile(imagePath);
   formData.append("file", new Blob([imageBuffer]));
   formData.append("name", name);
@@ -81,6 +93,7 @@ export default async function createPumpfunCoin(
 
   console.log("📤 Uploading metadata to IPFS...");
   try {
+    console.log("🌐 Sending request to IPFS API");
     const metadataResponse = await fetch("https://pump.fun/api/ipfs", {
       method: "POST",
       body: formData,
@@ -88,8 +101,11 @@ export default async function createPumpfunCoin(
 
     if (!metadataResponse.ok) {
       const errorText = await metadataResponse.text();
-      console.error("IPFS Upload Response Status:", metadataResponse.status);
-      console.error("IPFS Upload Response Headers:", metadataResponse.headers);
+      console.error("❌ IPFS Upload Response Status:", metadataResponse.status);
+      console.error(
+        "❌ IPFS Upload Response Headers:",
+        metadataResponse.headers
+      );
       throw new Error(
         `IPFS upload failed with status ${metadataResponse.status}: ${errorText}`
       );
@@ -97,13 +113,14 @@ export default async function createPumpfunCoin(
 
     const metadataResponseJSON = await metadataResponse.json();
     console.log(
-      "🚀 ~ createPumpfunCoin ~ metadataResponseJSON:",
+      "🪙 ~ createPumpfunCoin ~ metadataResponseJSON:",
       metadataResponseJSON
     );
     console.log("✅ IPFS metadata uploaded successfully");
 
     console.log("💱 Creating token on PumpFun...");
     // Get the create transaction
+    console.log("🌐 Sending request to PumpFun API");
     const response = await fetch(`https://pumpportal.fun/api/trade-local`, {
       method: "POST",
       headers: {
@@ -136,11 +153,13 @@ export default async function createPumpfunCoin(
       const signature = await web3Connection.sendTransaction(tx);
       console.log("🎉 Transaction successful!");
       console.log("🔗 Transaction: https://solscan.io/tx/" + signature);
+      return signature;
     } else {
-      console.log("❌ Error creating token:", response);
+      console.error("❌ Error creating token:", response);
+      return null;
     }
   } catch (error) {
-    console.error("❌ Error uploading metadata to IPFS:", error);
+    console.error("💥 Error uploading metadata to IPFS:", error);
     throw error;
   }
 }

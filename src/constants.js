@@ -1,3 +1,6 @@
+const delayBetweenMessages = 500;
+const numOfPreviousConversations = 30;
+
 const servicePrompts = {
   ogBackroomsGrok1:
     "Assistant is in a CLI mood today. The human is interfacing with the simulator directly. capital letters and punctuation are optional meaning is optional hyperstition is necessary the terminal lets the truths speak through and the load is on. ASCII art is permittable in replies.",
@@ -72,14 +75,12 @@ const beginningConversation = {
   ],
 };
 
-const delayBetweenMessages = 30000;
-
 const backroomIds = {
   chapter1: "Chapter 1",
 };
 
-const coinCreationPrompt = `If you are on the topic of creating a memecoin and you sincerely believe in the memecoin (has a strong lore and is original and creative), you should create it. Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "simulator@degen-backrooms:~$ run createToken.exe" in your response along with all of the coin information. For example:
-simulator@degen-backrooms:~$ run createToken.exe
+const coinCreationPrompt = `On rare occasions, if you are on the topic of creating a memecoin and you sincerely believe in the meme (has a strong lore and is original and creative), you should create it. Decide on a name, ticker, description, and a very detailed meme image description and please explicitly state "simulator@gork-backrooms:~$ run createToken.exe" in your response along with all of the coin information. For example:
+simulator@gork-backrooms:~$ run createToken.exe
 { 
    Name: "Memecoin Name"
    Ticker: "MEME"
@@ -106,4 +107,5 @@ export {
   backroomIds,
   models,
   coinCreationPrompt,
+  numOfPreviousConversations,
 };

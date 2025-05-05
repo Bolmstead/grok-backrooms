@@ -40,12 +40,10 @@ const ScenarioSchema = new mongoose.Schema({
   ],
   ai1Model: {
     type: String,
-    enum: Object.values(models),
     required: true,
   },
   ai2Model: {
     type: String,
-    enum: Object.values(models),
     required: true,
   },
   systemMessageAI1: {
