@@ -42,7 +42,7 @@ async function ensureLoggedIn() {
   return isLoggedIn;
 }
 
-export async function sendTweet(msg) {
+export async function sendTweet(dbMessage) {
   try {
     const loggedIn = await ensureLoggedIn();
     if (!loggedIn) {
@@ -50,8 +50,23 @@ export async function sendTweet(msg) {
       return false;
     }
 
+    const { content, _id, scenario, messageCreatedBy } = dbMessage;
+    const { ai1Name, ai2Name } = scenario;
+    let aiName = "";
+    if (messageCreatedBy === "ai1") {
+      aiName = ai1Name;
+    } else if (messageCreatedBy === "ai2") {
+      aiName = ai2Name;
+    }
+    if (!aiName || !content || !_id || !scenario) {
+      console.log("Error sending message:", dbMessage);
+      return false;
+    }
+    const tweetMessage = `<${aiName}:${_id}>
+${content}`;
+
     console.log("🐦 Sending tweet...");
-    await scraper.sendTweet(msg);
+    await scraper.sendTweet(tweetMessage);
     console.log("✅ Tweet sent successfully");
     return true;
   } catch (error) {

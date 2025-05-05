@@ -32,6 +32,9 @@ importers:
       agent-twitter-client:
         specifier: ^0.0.18
         version: 0.0.18(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      axios:
+        specifier: ^1.9.0
+        version: 1.9.0(debug@4.4.0)
       bs58:
         specifier: ^6.0.0
         version: 6.0.0
