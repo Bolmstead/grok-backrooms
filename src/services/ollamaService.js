@@ -106,8 +106,8 @@ async function sendOllamaMessage(receiver, messages, scenario) {
     console.log("💾 Saving message to database");
     await dbMessage.save();
 
-    // await sendTweet(dbMessage);
-    // await sendTeleMessage(dbMessage);
+    await sendTweet(dbMessage);
+    await sendTeleMessage(dbMessage);
 
     return dbMessage;
   } catch (error) {

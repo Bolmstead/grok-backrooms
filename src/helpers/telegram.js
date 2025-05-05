@@ -50,12 +50,12 @@ ${content}`;
     try {
       await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         chat_id: errorChatId,
-        text: `Error sending message:
+        text: `THROWN Error sending message:
 aiName: ${aiName} 
 content: ${content} 
 _id: ${_id} `,
       });
-      console.error("Error sending message:");
+      console.error("THROWN Error sending message:");
     } catch (error) {
       console.error("Error sending telegram error message:", error);
     }

@@ -8,8 +8,7 @@ simulator@gork-backrooms:~$ run createToken.exe
    Ticker: "MEME"
    Description: "description of the coin"
    Image Description: "A detailed description of the coin's image/logo. Be creative and specific about colors, style, and any characters or symbols. Max 1024 characters. For example: 'A cartoon rocket ship with rainbow flames, flying through space with dollar signs in its wake'"
-}
-`;
+}`;
 
 const models = {
   "grok-3-beta": "grok-3-beta",
